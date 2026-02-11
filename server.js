@@ -1,18 +1,14 @@
 const express = require('express');
 const axios = require('axios');
 const cors = require('cors');
-const path = require('path');
 
 const app = express();
-
-// Configurações
 app.use(cors());
 app.use(express.json());
-app.use(express.static('.')); // Serve o seu index.html automaticamente
 
+// ATENÇÃO: Use variáveis de ambiente (.env) para o Token em produção!
 const MP_ACCESS_TOKEN = 'APP_USR-7500112478325134-021111-12c64fd8a13547f6e00ff7db6f9ffd73-290268833';
 
-// Rota que seu front-end vai chamar
 app.post('/processar-pagamento', async (req, res) => {
     try {
         const response = await axios.post('https://api.mercadopago.com/v1/payments', req.body, {
@@ -21,14 +17,13 @@ app.post('/processar-pagamento', async (req, res) => {
                 'X-Idempotency-Key': Date.now().toString()
             }
         });
+        
         res.json(response.data);
     } catch (error) {
-        console.error('Erro MP:', error.response ? error.response.data : error.message);
-        res.status(500).json({ error: 'Erro ao gerar Pix' });
+        // Log detalhado para você descobrir por que a API negou o QR Code
+        console.error('ERRO MERCADO PAGO:', error.response?.data || error.message);
+        res.status(400).json(error.response?.data || { error: "Erro desconhecido" });
     }
 });
 
-const PORT = 3000;
-app.listen(PORT, () => {
-    console.log(`✅ Servidor rodando em http://localhost:${PORT}`);
-});
+app.listen(3000, () => console.log('Servidor rodando em http://localhost:3000'));
