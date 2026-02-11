@@ -1,0 +1,255 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Galeria de Portfólio</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
+        import { getAuth, signInAnonymously, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
+        import { getFirestore, onSnapshot, collection, query, orderBy } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+
+        // --- Firebase Configuration ---
+        const firebaseConfig = {
+            apiKey: "AIzaSyCrAdXU968crHlyjzu5bMiDzv0wo16EHBs",
+            authDomain: "arquitetura-e-interiores.firebaseapp.com",
+            projectId: "arquitetura-e-interiores",
+            storageBucket: "arquitetura-e-interiores.firebasestorage.app",
+            messagingSenderId: "578518882376",
+            appId: "1:578518882376:web:14d4064f4b8f6812fd607d",
+            measurementId: "G-2FDB83L8TW"
+        };
+        
+        // --- Firebase Initialization ---
+        let db, auth;
+        const state = {
+            photos: []
+        };
+        let currentCarouselPhotos = [];
+        let currentImageIndex = 0;
+
+        const app = initializeApp(firebaseConfig);
+        db = getFirestore(app);
+        auth = getAuth(app);
+        
+        onAuthStateChanged(auth, async (user) => {
+            if (!user) {
+                await signInAnonymously(auth);
+            }
+            setupListeners();
+            document.getElementById('loading').classList.add('hidden');
+            document.getElementById('app-container').classList.remove('hidden');
+        });
+
+        // --- UI Functions ---
+        const showMessage = (message, type = 'info') => {
+            const messageBox = document.getElementById('message-box');
+            messageBox.textContent = message;
+            messageBox.className = 'p-3 mb-4 rounded-md text-white transition-opacity duration-300';
+            
+            if (type === 'success') {
+                messageBox.classList.add('bg-green-500');
+            } else if (type === 'error') {
+                messageBox.classList.add('bg-red-500');
+            } else {
+                messageBox.classList.add('bg-blue-500');
+            }
+            
+            messageBox.classList.remove('opacity-0', 'hidden');
+            setTimeout(() => {
+                messageBox.classList.add('opacity-0');
+                setTimeout(() => messageBox.classList.add('hidden'), 300);
+            }, 3000);
+        };
+        
+        const renderGallery = () => {
+            const container = document.getElementById('photo-gallery');
+            container.innerHTML = '';
+            
+            if (state.photos.length === 0) {
+                container.innerHTML = `
+                    <div class="col-span-1 sm:col-span-2 lg:col-span-3 text-center py-20">
+                        <p class="text-xl text-gray-500">Nenhum item na galeria ainda.</p>
+                        <p class="text-gray-400 mt-2">Adicione novos itens no painel de administração.</p>
+                    </div>
+                `;
+                return;
+            }
+            
+            state.photos.forEach(photo => {
+                const photoCard = document.createElement('div');
+                photoCard.classList.add('bg-white', 'rounded-lg', 'shadow-md', 'p-4', 'flex', 'flex-col', 'items-center', 'space-y-2', 'cursor-pointer', 'transform', 'hover:scale-105', 'transition-transform');
+                photoCard.onclick = () => window.showPortfolioImages(photo.id);
+                
+                // Pega a primeira imagem para o preview, ou uma URL de placeholder se não houver imagens
+                const previewImage = photo.images && photo.images.length > 0 ? photo.images[0].url : 'https://placehold.co/600x400/cccccc/333333?text=Sem+Imagem';
+                
+                photoCard.innerHTML = `
+                    <div class="w-full h-48 bg-gray-200 rounded-md overflow-hidden">
+                        <img src="${previewImage}" alt="${photo.description}" class="w-full h-full object-cover">
+                    </div>
+                    <p class="font-bold text-lg text-gray-800">${photo.name}</p>
+                    <p class="text-sm text-gray-600 text-center">${photo.description}</p>
+                    <p class="text-xs font-medium text-indigo-500">${photo.category}</p>
+                `;
+                container.appendChild(photoCard);
+            });
+        };
+        
+        const setupListeners = () => {
+            if (!auth.currentUser) {
+                console.error("Usuário não autenticado. Não é possível configurar o listener do Firestore.");
+                return;
+            }
+            const q = query(collection(db, `artifacts/${firebaseConfig.projectId}/public/data/galleries`));
+            onSnapshot(q, (querySnapshot) => {
+                state.photos = querySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+                renderGallery();
+            }, (error) => {
+                console.error("Erro no listener de snapshot:", error);
+                showMessage('Erro ao carregar fotos. Verifique as permissões.', 'error');
+            });
+        };
+        
+        // --- Carousel/Modal Functions ---
+        window.showPortfolioImages = (docId) => {
+            const portfolioItem = state.photos.find(p => p.id === docId);
+            if (!portfolioItem || !portfolioItem.images || portfolioItem.images.length === 0) {
+                showMessage('Nenhuma imagem encontrada para este projeto.', 'info');
+                return;
+            }
+            
+            currentCarouselPhotos = portfolioItem.images;
+            currentImageIndex = 0;
+
+            const viewerTitle = document.getElementById('viewer-title');
+            const thumbnailsContainer = document.getElementById('carousel-thumbnails');
+
+            viewerTitle.textContent = portfolioItem.name;
+            thumbnailsContainer.innerHTML = '';
+
+            currentCarouselPhotos.forEach((image, index) => {
+                const thumbElement = document.createElement('img');
+                thumbElement.src = image.url;
+                thumbElement.alt = `Thumbnail ${index + 1}`;
+                thumbElement.classList.add('w-20', 'h-20', 'object-cover', 'rounded-md', 'cursor-pointer', 'transition-all', 'duration-300', 'border-2', 'border-transparent', 'hover:border-indigo-500');
+                thumbElement.onclick = () => window.jumpToImage(index);
+                thumbnailsContainer.appendChild(thumbElement);
+            });
+
+            window.updateCarousel();
+            document.getElementById('image-viewer-modal').classList.remove('hidden');
+        };
+        
+        window.updateCarousel = () => {
+            const mainImage = document.getElementById('main-carousel-image');
+            const thumbnails = document.getElementById('carousel-thumbnails').children;
+
+            if (currentCarouselPhotos.length > 0) {
+                mainImage.src = currentCarouselPhotos[currentImageIndex].url;
+                mainImage.alt = `Imagem ${currentImageIndex + 1} de ${currentCarouselPhotos.length}`;
+
+                for (let i = 0; i < thumbnails.length; i++) {
+                    thumbnails[i].classList.remove('border-indigo-500');
+                    if (i === currentImageIndex) {
+                        thumbnails[i].classList.add('border-indigo-500');
+                    }
+                }
+            }
+        };
+
+        window.prevImage = () => {
+            if (currentCarouselPhotos.length > 0) {
+                currentImageIndex = (currentImageIndex - 1 + currentCarouselPhotos.length) % currentCarouselPhotos.length;
+                window.updateCarousel();
+            }
+        };
+
+        window.nextImage = () => {
+            if (currentCarouselPhotos.length > 0) {
+                currentImageIndex = (currentImageIndex + 1) % currentCarouselPhotos.length;
+                window.updateCarousel();
+            }
+        };
+
+        window.jumpToImage = (index) => {
+            if (index >= 0 && index < currentCarouselPhotos.length) {
+                currentImageIndex = index;
+                window.updateCarousel();
+            }
+        };
+
+        window.closeImageViewerModal = () => {
+            document.getElementById('image-viewer-modal').classList.add('hidden');
+        };
+
+        window.onload = () => {};
+    </script>
+</head>
+<body class="bg-gray-100 font-sans text-gray-800">
+
+    <!-- Loading Screen -->
+    <div id="loading" class="fixed inset-0 bg-gray-100 flex items-center justify-center z-50">
+        <div class="text-center">
+            <div class="animate-spin rounded-full h-16 w-16 border-t-2 border-b-2 border-indigo-500 mx-auto"></div>
+            <p class="mt-4 text-gray-600">Carregando galeria...</p>
+        </div>
+    </div>
+
+    <!-- Main App Container -->
+    <div id="app-container" class="container mx-auto p-4 md:p-8 space-y-12 hidden">
+        
+        <!-- Header -->
+        <header class="text-center space-y-2">
+            <h1 class="text-4xl font-extrabold text-indigo-800">Galeria de Portfólio</h1>
+            <p class="text-lg text-gray-600">Explore nossos projetos de arquitetura e interiores</p>
+            <div id="message-box" class="opacity-0 hidden"></div>
+        </header>
+
+        <!-- Galeria de Imagens -->
+        <section class="bg-white rounded-2xl shadow-xl p-6 md:p-8">
+            <h2 class="text-3xl font-bold text-center text-indigo-700 mb-6">Ideias e Sugestões</h2>
+            <div id="photo-gallery" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-8">
+                <!-- As fotos serão renderizadas aqui -->
+            </div>
+        </section>
+
+    </div>
+
+    <!-- Modal de Visualização de Imagens -->
+    <div id="image-viewer-modal" class="hidden fixed inset-0 bg-gray-900 bg-opacity-75 z-50 flex items-center justify-center p-4">
+        <div class="bg-white rounded-lg p-6 shadow-xl w-full max-w-4xl max-h-[90vh] overflow-hidden relative flex flex-col">
+            <button onclick="window.closeImageViewerModal()" class="absolute top-2 right-2 text-gray-500 hover:text-gray-800 transition-colors">
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
+                </svg>
+            </button>
+            <h3 id="viewer-title" class="text-lg font-bold text-gray-800 mb-4 text-center"></h3>
+            
+            <!-- Carrossel de Imagens -->
+            <div class="flex flex-col items-center flex-grow">
+                <!-- Imagem Principal e Botões de Navegação -->
+                <div class="relative w-full h-96 flex items-center justify-center mb-4">
+                    <button onclick="window.prevImage()" class="absolute left-2 z-10 p-2 rounded-full bg-gray-800 bg-opacity-50 text-white hover:bg-opacity-75 focus:outline-none">
+                        <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7" />
+                        </svg>
+                    </button>
+                    <img id="main-carousel-image" src="" alt="Imagem Principal" class="max-w-full max-h-full object-contain rounded-lg shadow-md">
+                    <button onclick="window.nextImage()" class="absolute right-2 z-10 p-2 rounded-full bg-gray-800 bg-opacity-50 text-white hover:bg-opacity-75 focus:outline-none">
+                        <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7" />
+                        </svg>
+                    </button>
+                </div>
+                
+                <!-- Miniaturas (Thumbnails) para navegação -->
+                <div id="carousel-thumbnails" class="flex-shrink-0 flex justify-center items-center overflow-x-auto w-full p-2 space-x-2">
+                    <!-- Miniaturas serão injetadas aqui -->
+                </div>
+            </div>
+        </div>
+    </div>
+</body>
+</html>
