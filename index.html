@@ -416,7 +416,7 @@
             container.innerHTML = `<div class="animate-pulse flex flex-col items-center"><div class="w-32 h-32 bg-slate-100 rounded-full mb-4"></div><p class="text-[10px] text-slate-400 font-bold uppercase tracking-widest">Acessando API de Produção...</p></div>`;
 
             try {
-                const response = await fetch('http://localhost:3000/processar-pagamento', {
+                const response = await fetch('https://academia-contabil-web.vercel.app/', {
                     method: 'POST',
                     headers: {
                         'Content-Type': 'application/json'},
