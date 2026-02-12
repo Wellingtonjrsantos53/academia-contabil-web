@@ -1,2 +1,0 @@
-cd C:/Users/welli/Desktop/wrarquitetura
-node server.js

@@ -1,9 +1,0 @@
-const firebaseConfig = { 
-  apiKey : "AIzaSyC3_bloxB7PH4xlGu1KafL_1I4uu6CGGLQ" , 
-  authDomain: "banco-de-dados-1de17.firebaseapp.com",
-  projectId: "banco-de-dados-1de17",
-  storageBucket : "banco-de-dados-1de17.firebasestorage.app" , 
-  messagingSenderId : "491305458539" , 
-  appId : "1:491305458539:web:7482f549e92b2b4715ca2e" , 
-  measurementId : "G-CXLHNWW4ET" 
-};
