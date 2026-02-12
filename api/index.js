@@ -11,7 +11,7 @@ const MP_ACCESS_TOKEN = 'APP_USR-7500112478325134-021111-12c64fd8a13547f6e00ff7d
 app.post('/processar-pagamento', async (req, res) => {
     try {
         const paymentData = {
-            transaction_amount: 1.00,
+            transaction_amount: 2.00,
             description: 'Recarga Academia Contábil',
             payment_method_id: 'pix',
             payer: {
